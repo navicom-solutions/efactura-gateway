@@ -24,7 +24,8 @@ const ERROR_HINTS: Record<string, string> = {
     'Pass seria and number exactly as returned by search (keep leading zeros). If it still fails, search again and retry get.',
   UPSTREAM_TIMEOUT: 'SFS was slow. Safe to retry; narrow the filters (for example issued_on) for searches.',
   UPSTREAM_NETWORK: 'Safe to retry in a moment.',
-  UPSTREAM_HTTP: 'SFS returned an error. Safe to retry later; if it persists, the API user may lack access.',
+  UPSTREAM_HTTP:
+    'SFS had a temporary error. Wait a few seconds and retry the same call once. If it keeps failing, the API user may lack access to that invoice.',
   UPSTREAM_PARSE: 'Safe to retry.',
   UPSTREAM_BUSINESS: 'SFS rejected the request. Explain the message to the user.',
   IDEMPOTENCY_CONFLICT: 'This idempotency_key was used for a different invoice. Use a new key for a new invoice.',

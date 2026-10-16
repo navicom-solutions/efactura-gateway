@@ -159,15 +159,16 @@ export const createInvoiceServices = (
     );
   };
 
-  /** SFS stores invoice numbers as fixed-width strings (usually 9 digits with leading zeros). */
+  /** SFS stores invoice numbers as fixed-width strings (usually 9 digits with leading zeros). Prefer padded. */
   const numberVariants = (raw: string): string[] => {
-    const n = raw.trim();
+    const n = raw.trim().replace(/^["']|["']$/g, '');
     const padded = n.padStart(9, '0');
-    return n === padded ? [n] : [n, padded];
+    return n === padded ? [n] : [padded, n];
   };
 
   const getBySeria: InvoiceServices['getBySeria'] = async (input, creds, requestId) => {
     let lastMessage = 'Invoice not found';
+    let lastUpstream: AppError | null = null;
     for (const number of numberVariants(input.number)) {
       const body = `<tns:GetInvoicesBySeriaNumber>
       <tns:request>
@@ -186,14 +187,21 @@ export const createInvoiceServices = (
         creds,
         body,
       );
-      if (isLeft(xmlE)) return xmlE;
+      if (isLeft(xmlE)) {
+        // SFS sometimes returns HTML 500 for a bad number format; try the next variant.
+        if (xmlE.left.kind === 'upstream_http' || xmlE.left.kind === 'upstream_timeout') {
+          lastUpstream = xmlE.left;
+          continue;
+        }
+        return xmlE;
+      }
       const parsed = parseGetBySeriaResponse(xmlE.right);
       if (isLeft(parsed)) return parsed;
       const r = parsed.right;
       if (r.success) return right(okEnvelope(r.requestId || requestId, r.results, r.total, r.message));
       lastMessage = r.message || lastMessage;
     }
-    return left(notFoundError(lastMessage));
+    return left(lastUpstream ?? notFoundError(lastMessage));
   };
 
   const assignSerials: InvoiceServices['assignSerials'] = async (input, creds, requestId) => {

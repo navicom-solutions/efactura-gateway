@@ -5,7 +5,7 @@ import { createSoapStub, FIXTURES, left, right } from '../test/helpers.js';
 import { createCredentialVerifier } from './verify-credentials.js';
 
 const creds = { username: 'api-user', password: 'secret' };
-const sfsHtml500 = upstreamHttp(500, 'HTTP Error: 500 Response: <!DOCTYPE html>\n<html lang="ro">', false);
+const sfsHtml500 = upstreamHttp(500, 'SFS returned HTTP 500 (temporary error page). Retry in a moment.', false);
 
 describe('createCredentialVerifier', () => {
   it('valid when SFS returns a result for the read-only call', async () => {

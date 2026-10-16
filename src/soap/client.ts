@@ -29,6 +29,12 @@ export type SoapClient = {
 const looksLikeHtml = (body: string): boolean =>
   /<!DOCTYPE html>/i.test(body) || /<html[\s>]/i.test(body);
 
+/** SFS often answers outages / bad auth with a generic HTML page; never echo that CSS to clients. */
+const describeHttpFailure = (status: number, body: string): string =>
+  looksLikeHtml(body)
+    ? `SFS returned HTTP ${status} (temporary error page). Retry in a moment.`
+    : `SFS returned HTTP ${status}: ${body.replace(/\s+/g, ' ').trim().slice(0, 200)}`;
+
 export const createSoapClient = (
   env: Env,
   log: (level: 'info' | 'warn' | 'error' | 'debug', msg: string, meta?: Record<string, unknown>) => void,
@@ -83,13 +89,7 @@ export const createSoapClient = (
       });
 
       if (!res.ok) {
-        return left(
-          upstreamHttp(
-            res.status,
-            `HTTP Error: ${res.status} Response: ${text.slice(0, 500)}`,
-            meta.isWrite,
-          ),
-        );
+        return left(upstreamHttp(res.status, describeHttpFailure(res.status, text), meta.isWrite));
       }
 
       if (looksLikeHtml(text)) {
