@@ -68,18 +68,62 @@ writes safe to retry.
 
 ## Quick start
 
-### One-click deploy
+### eFactura API credentials
+
+The gateway signs in to SFS with an **eFactura API user**, not your personal login.
+Create one once per company:
+
+1. Log in to [efactura.sfs.md](https://efactura.sfs.md).
+2. Open **Setări → Utilizatorii Companiei**
+   ([direct link](https://efactura.sfs.md/default.aspx#MySettings/CompanyUsers)) and click
+   **Creează utilizator API**.
+3. Fill in email, username and password, choose the **API User** role, and register.
+
+Use that username and password:
+
+- **Claude, ChatGPT and other MCP clients:** on the *Connect Moldova eFactura* page that
+  opens when you connect (see below). Nothing is configured on the server.
+- **REST API:** per request in the `X-Provider-Credentials` header, or once on the server
+  as `EFACTURA_USERNAME` / `EFACTURA_PASSWORD`.
+
+### One-click deploy (no coding needed)
 
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/navicom-solutions/efactura-gateway)
 
-The [Render Blueprint](render.yaml) provisions the Docker service with a persistent disk
-for the idempotency ledger, generates `API_KEY`, `ENCRYPTION_KEY` and `TOKEN_SIGNING_KEY`,
-and asks for your SFS credentials. Set `PUBLIC_URL` to the service URL
-(`https://<name>.onrender.com`) so OAuth for MCP clients resolves correctly. A paid
-instance is required because free instances cannot attach disks.
+You need: an [eFactura API user](#efactura-api-credentials) and a card for Render (the
+Starter instance with a 1 GB disk costs about $7/month at the time of writing).
 
-Any host works as long as `/app/data` is on persistent storage. Avoid platforms with an
-ephemeral filesystem only (Heroku, DigitalOcean App Platform): losing the ledger on
+**1. Deploy the gateway (about 5 minutes)**
+
+1. Click **Deploy to Render** above and sign up (GitHub, Google or email).
+2. Render shows the `efactura-gateway` blueprint. Click **Deploy Blueprint**. There is
+   nothing to fill in: secrets are generated for you.
+3. Wait until the service shows **Live**. Copy its address from the top of the page, for
+   example `https://efactura-gateway-abcd.onrender.com`.
+4. Check it works: open `https://<your-address>/health` in a browser. You should see
+   `"ok":true` and your address as `public_url`.
+
+**2. Connect it to Claude**
+
+1. In [claude.ai](https://claude.ai) open **Settings → Connectors → Add custom connector**
+   (custom connectors may require a paid Claude plan).
+2. Name it `eFactura` and paste `https://<your-address>/mcp` as the URL. Click **Add**.
+3. Click **Connect**. A page titled *Connect Moldova eFactura* opens: enter the
+   [API user's](#efactura-api-credentials) username and password, then **Authorize**.
+4. In a new chat, enable the eFactura connector from the tools menu and ask, for example,
+   *"Show invoices rejected this month"*.
+
+Your eFactura password stays on your server, encrypted; Claude only receives invoice data.
+Colleagues can add the same URL and sign in with their own API users. ChatGPT,
+Cursor and other MCP clients connect the same way using the `/mcp` URL.
+
+**Optional:** to use your own domain, add it under the service's **Settings → Custom
+Domains** in Render and set the `PUBLIC_URL` environment variable to it. To let REST
+callers use one default eFactura account, set `EFACTURA_USERNAME` and `EFACTURA_PASSWORD`.
+The REST API key is in **Environment → `API_KEY`**.
+
+Other hosts work too, as long as `/app/data` is on persistent storage. Avoid platforms
+with only an ephemeral filesystem (Heroku, DigitalOcean App Platform): losing the ledger on
 redeploy defeats duplicate-invoice protection.
 
 ### Docker
@@ -282,6 +326,16 @@ e-Factura direct la **Claude, ChatGPT** și alți asistenți AI prin MCP.
 - Protecție împotriva facturilor duplicate la timeout-urile SFS de la sfârșit de lună
 - Server MCP e-Factura cu autentificare OAuth pentru fiecare utilizator
 - Găzduire proprie cu Docker; licență AGPL-3.0, licență comercială disponibilă
+
+**Instalare fără programare:**
+
+1. Pe [efactura.sfs.md](https://efactura.sfs.md) mergeți la **Setări → Utilizatorii Companiei**
+   ([link direct](https://efactura.sfs.md/default.aspx#MySettings/CompanyUsers)) și apăsați
+   **Creează utilizator API**: email, utilizator, parolă, rolul **API User**, înregistrați.
+2. Apăsați **Deploy to Render** (mai sus), creați un cont și apăsați **Deploy Blueprint**.
+3. Când serviciul este **Live**, copiați adresa lui (de ex. `https://efactura-gateway-abcd.onrender.com`).
+4. În Claude: **Settings → Connectors → Add custom connector**, adresa `https://<adresa>/mcp`.
+5. Apăsați **Connect** și introduceți utilizatorul și parola API de la pasul 1. Gata.
 
 Dezvoltat și publicat open-source de **Navicom Solutions Ltd.**
 

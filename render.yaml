@@ -1,6 +1,9 @@
 # One-click deploy: https://render.com/deploy?repo=https://github.com/navicom-solutions/efactura-gateway
 # The idempotency ledger and OAuth store are SQLite files; they MUST live on the persistent
 # disk, otherwise a redeploy forgets which invoices were already posted.
+# PUBLIC_URL defaults to RENDER_EXTERNAL_URL; set it only when using a custom domain.
+# EFACTURA_USERNAME / EFACTURA_PASSWORD are optional: MCP users sign in with their own
+# account. Add them in the dashboard only if REST callers should use a default account.
 services:
   - type: web
     name: efactura-gateway
@@ -17,8 +20,6 @@ services:
         value: "3000"
       - key: HTTP_PORT
         value: "3000"
-      - key: PUBLIC_URL
-        sync: false
       - key: API_KEY
         generateValue: true
       - key: ENCRYPTION_KEY
@@ -27,10 +28,6 @@ services:
         generateValue: true
       - key: EFACTURA_ENDPOINT
         value: https://efactura-api.sfs.md/Service.svc
-      - key: EFACTURA_USERNAME
-        sync: false
-      - key: EFACTURA_PASSWORD
-        sync: false
       - key: DATABASE_PATH
         value: /app/data/idempotency.db
       - key: OAUTH_DATABASE_PATH

@@ -48,8 +48,16 @@ export type Env = z.infer<typeof EnvSchema> & {
   TOKEN_SIGNING_KEY: string;
 };
 
+/** Hosting platforms that expose the service's public URL at runtime. */
+const PLATFORM_PUBLIC_URL_VARS = ['RENDER_EXTERNAL_URL'] as const;
+
+const withPlatformDefaults = (raw: NodeJS.ProcessEnv): NodeJS.ProcessEnv => ({
+  ...raw,
+  PUBLIC_URL: raw.PUBLIC_URL || PLATFORM_PUBLIC_URL_VARS.map((k) => raw[k]).find(Boolean),
+});
+
 export const loadEnv = (raw: NodeJS.ProcessEnv = process.env): Env => {
-  const parsed = EnvSchema.safeParse(raw);
+  const parsed = EnvSchema.safeParse(withPlatformDefaults(raw));
   if (!parsed.success) {
     const detail = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ');
     throw new Error(`Invalid environment: ${detail}`);
