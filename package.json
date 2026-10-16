@@ -32,7 +32,7 @@
     "start": "node build/index.js",
     "dev": "tsx watch src/index.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --import tsx --test src/**/*.test.ts"
+    "test": "node --import tsx --test src/**/*.test.ts relay/src/*.test.ts"
   },
   "dependencies": {
     "better-sqlite3": "^11.8.1",

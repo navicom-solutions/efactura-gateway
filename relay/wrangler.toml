@@ -1,0 +1,25 @@
+name = "efactura-feedback"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+
+# Created with: npx wrangler d1 create efactura-feedback (paste the printed database_id here)
+[[d1_databases]]
+binding = "DB"
+database_name = "efactura-feedback"
+database_id = "REPLACE_WITH_DATABASE_ID"
+migrations_dir = "migrations"
+
+# Secrets (npx wrangler secret put <NAME>):
+#   ADMIN_TOKEN          bearer token for GET /v1/reports
+#   TELEGRAM_BOT_TOKEN   from @BotFather
+#   TELEGRAM_CHAT_ID     your chat id (send the bot a message, then open getUpdates)
+#
+# Optional email via Cloudflare Email Routing: enable Email Routing on your domain,
+# verify the destination address, then uncomment and set EMAIL_FROM / EMAIL_TO.
+# [[send_email]]
+# name = "EMAIL"
+# destination_address = "you@example.com"
+#
+# [vars]
+# EMAIL_FROM = "feedback@example.com"
+# EMAIL_TO = "you@example.com"

@@ -12,3 +12,5 @@ logs/
 docs/local/
 *.log
 coverage/
+.wrangler/
+.dev.vars

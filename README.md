@@ -209,7 +209,11 @@ eFactura credentials on a consent page; those are stored encrypted and never rea
 
 Available tools: `efactura_search_invoices`, `efactura_get_invoice`,
 `efactura_post_invoice`, `efactura_job_status`, `efactura_assign_serials`,
-`efactura_get_taxpayer`, `efactura_list_accepted`, `efactura_list_rejected`.
+`efactura_get_taxpayer`, `efactura_list_accepted`, `efactura_list_rejected`,
+`efactura_report_issue`.
+
+On connect, the server sends the assistant usage instructions: what the codes mean, how
+to page through large results, and when a confirmation is needed before posting.
 
 Example prompts:
 
@@ -218,6 +222,20 @@ Example prompts:
 - *"Issue an invoice to ACME SRL for 3 hours of consulting at 500 MDL/hour, VAT 20%."*
 
 Server-side scripts can skip OAuth and use `Authorization: Bearer <API_KEY>` on `/mcp`.
+
+### Issue reports from the assistant
+
+When a tool fails or a feature is missing, the assistant can offer to send a short report
+to the maintainers with `efactura_report_issue`. It shows you the report first and sends
+it only after you agree.
+
+- **Sent:** report type, a one-line summary, a short description, the tool name and error
+  code, the gateway version, and an anonymous id of your deployment.
+- **Never sent:** invoices, SFS responses, credentials or tokens.
+- Emails, IDNOs, IBANs, phone numbers, invoice numbers and secrets are masked before
+  sending.
+- Reports are limited to 10 per deployment per day.
+- To turn it off, set `FEEDBACK_ENABLED=false`. The tool then no longer appears.
 
 ## Design principles
 
@@ -248,7 +266,9 @@ src/
   queue/      BullMQ async posts
   oauth/      OAuth 2.1 server, encrypted credential store
   mcp/        MCP JSON-RPC endpoint + tools
+  feedback/   issue report contract, masking, relay client
   http/       Fastify app and routes
+relay/        Cloudflare Worker that receives issue reports
 ```
 
 ## Configuration
@@ -264,6 +284,7 @@ important ones:
 | `ENCRYPTION_KEY` / `TOKEN_SIGNING_KEY` | Required in production for MCP/OAuth and the queue |
 | `QUEUE_ENABLED` / `REDIS_URL` | Async posting |
 | `MCP_ENABLED` | Toggle `/mcp` and OAuth routes |
+| `FEEDBACK_ENABLED` / `FEEDBACK_URL` | [Issue reports](#issue-reports-from-the-assistant); `false` opts out |
 
 Security model: [docs/SECURITY.md](docs/SECURITY.md).
 
@@ -274,6 +295,26 @@ npm run typecheck
 npm test                  # unit + HTTP inject tests, no network needed
 SMOKE=1 SMOKE_BASE_URL=http://127.0.0.1:3000/v1 SMOKE_API_KEY=... npm test   # live smoke
 ```
+
+### Feedback relay
+
+[relay/](relay) is a Cloudflare Worker that stores issue reports in D1 and notifies you by
+Telegram and/or email. To run your own (free plan is enough):
+
+```bash
+npm ci && cd relay && npm ci
+npx wrangler login
+npx wrangler d1 create efactura-feedback      # paste database_id into wrangler.toml
+npm run migrate
+npx wrangler secret put ADMIN_TOKEN           # for GET /v1/reports
+npx wrangler secret put TELEGRAM_BOT_TOKEN    # from @BotFather
+npx wrangler secret put TELEGRAM_CHAT_ID
+npm run deploy
+```
+
+Point the gateway at it with `FEEDBACK_URL=https://<worker-host>/v1/reports`. For email,
+see the comments in [relay/wrangler.toml](relay/wrangler.toml). List stored reports with
+`curl -H "Authorization: Bearer <ADMIN_TOKEN>" https://<worker-host>/v1/reports`.
 
 ## FAQ
 
