@@ -41,7 +41,7 @@ describe('live smoke (SMOKE=1)', { skip: !enabled }, () => {
       headers: authHeaders(),
       body: JSON.stringify({ actor_role: 1, status: 8 }),
     });
-    assert.ok([200, 400, 503, 504].includes(res.status), `unexpected ${res.status}`);
+    assert.ok([200, 400, 401, 503, 504].includes(res.status), `unexpected ${res.status}`);
     const body = (await res.json()) as { success?: boolean; retry_safe?: boolean };
     if (!body.success && res.status >= 500) {
       assert.equal(body.retry_safe, true, 'read failures must be retry_safe');

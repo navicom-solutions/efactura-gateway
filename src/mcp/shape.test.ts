@@ -66,4 +66,15 @@ describe('toolError', () => {
     assert.equal(p.retry_safe, false);
     assert.match(p.hint, /Do not post again/);
   });
+
+  it('tells the model to reconnect OAuth on PROVIDER_UNAUTHORIZED', () => {
+    const result = toolError({
+      code: 'PROVIDER_UNAUTHORIZED',
+      message: 'SFS rejected the API username/password',
+      retrySafe: false,
+    });
+    const p = payload(result);
+    assert.equal(p.retry_safe, false);
+    assert.match(p.hint, /reconnect/i);
+  });
 });

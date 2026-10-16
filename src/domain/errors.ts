@@ -41,6 +41,17 @@ export const authError = (message = 'Invalid or missing API key'): AppError => (
   code: 'UNAUTHORIZED',
 });
 
+/** SFS rejected the WS-Security username/password (HTML 500), not the gateway API key. */
+export const providerAuthError = (
+  message = 'SFS rejected the API username/password. Reconnect OAuth with the current password.',
+): AppError => ({
+  kind: 'auth',
+  message,
+  statusCode: 401,
+  retrySafe: false,
+  code: 'PROVIDER_UNAUTHORIZED',
+});
+
 export const notFoundError = (message: string): AppError => ({
   kind: 'not_found',
   message,
@@ -84,14 +95,15 @@ export const upstreamHttp = (
   forWrite: boolean,
   opts: { readonly html?: boolean } = {},
 ): AppError => {
+  // SFS answers invalid WS-Security credentials with a generic HTML 500 — treat as auth, not outage.
+  if (opts.html === true && status >= 500) return providerAuthError(message);
+
   const ambiguous = forWrite && status >= 500;
-  // SFS HTML 500 pages are usually bad credentials or a hard failure — do not retry-storm.
-  const html = opts.html === true;
   return {
     kind: 'upstream_http',
     message,
     statusCode: status >= 500 ? (forWrite ? 504 : 503) : 400,
-    retrySafe: !ambiguous && !html,
+    retrySafe: !ambiguous,
     code: ambiguous ? 'UPSTREAM_5XX_AMBIGUOUS' : 'UPSTREAM_HTTP',
   };
 };

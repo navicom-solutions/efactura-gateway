@@ -35,7 +35,9 @@ const envelopeResponse = (description: string) => ({
 
 const errorResponses = {
   '400': envelopeResponse('Validation error or upstream business rejection'),
-  '401': envelopeResponse('Missing or invalid API key'),
+  '401': envelopeResponse(
+    'Missing/invalid API key (`UNAUTHORIZED`) or rejected SFS username/password (`PROVIDER_UNAUTHORIZED`)',
+  ),
   '503': envelopeResponse('Upstream SFS unavailable / HTTP / timeout (see `retry_safe`)'),
   '504': envelopeResponse('Ambiguous write: SFS may already have the invoice (see `retry_safe`)'),
 };
