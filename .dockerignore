@@ -1,0 +1,11 @@
+node_modules
+build
+.git
+.secrets
+.env
+.env.*
+docs
+logs
+data
+*.md
+.github

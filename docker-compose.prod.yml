@@ -1,0 +1,64 @@
+# Production stack
+#   docker compose -f docker-compose.prod.yml up -d --build
+#   docker compose -f docker-compose.prod.yml --profile queue up -d --build   # + Redis for async posts
+#
+# The API binds to 127.0.0.1:HOST_PORT; put a TLS-terminating reverse proxy in front.
+
+name: api-efactura
+
+services:
+  api-efactura:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: api-efactura:latest
+    container_name: api-efactura
+    restart: always
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      HTTP_HOST: 0.0.0.0
+      HTTP_PORT: 3000
+      BASE_PATH: ${BASE_PATH:-/v1}
+      DATABASE_PATH: /app/data/idempotency.db
+      OAUTH_DATABASE_PATH: /app/data/oauth.db
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+    ports:
+      - "127.0.0.1:${HOST_PORT:-3000}:3000"
+    volumes:
+      - api-efactura-data:/app/data
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  redis:
+    profiles: ["queue"]
+    image: redis:7-alpine
+    restart: always
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - api-efactura-redis:/data
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+volumes:
+  api-efactura-data:
+  api-efactura-redis:

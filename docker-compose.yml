@@ -1,0 +1,25 @@
+# Local development
+#   docker compose up --build
+#   docker compose --profile queue up --build   # + Redis; set QUEUE_ENABLED=true in .env
+
+services:
+  api-efactura:
+    build: .
+    ports:
+      - "3000:3000"
+    env_file: .env
+    environment:
+      HTTP_HOST: 0.0.0.0
+      HTTP_PORT: 3000
+      BASE_PATH: /v1
+      DATABASE_PATH: /app/data/idempotency.db
+      OAUTH_DATABASE_PATH: /app/data/oauth.db
+      REDIS_URL: redis://redis:6379
+    volumes:
+      - ./data:/app/data
+
+  redis:
+    profiles: ["queue"]
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"

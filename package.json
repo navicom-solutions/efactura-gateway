@@ -1,0 +1,52 @@
+{
+  "name": "efactura-gateway",
+  "version": "1.1.0",
+  "private": true,
+  "description": "REST + MCP gateway for Moldova's SFS eFactura SOAP service",
+  "license": "AGPL-3.0-only",
+  "author": "Navicom Solutions Ltd.",
+  "keywords": [
+    "efactura",
+    "e-factura",
+    "moldova",
+    "e-invoicing",
+    "sfs",
+    "mcp",
+    "mcp-server",
+    "json",
+    "rest-api",
+    "soap"
+  ],
+  "homepage": "https://github.com/navicom-solutions/efactura-gateway#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/navicom-solutions/efactura-gateway.git"
+  },
+  "bugs": "https://github.com/navicom-solutions/efactura-gateway/issues",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node build/index.js",
+    "dev": "tsx watch src/index.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --import tsx --test src/**/*.test.ts"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.8.1",
+    "bullmq": "^5.81.5",
+    "fast-xml-parser": "^5.11.2",
+    "fastify": "^5.2.1",
+    "pino": "^9.6.0",
+    "zod": "^3.24.2",
+    "zod-to-json-schema": "^3.25.2"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.13.10",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2"
+  }
+}

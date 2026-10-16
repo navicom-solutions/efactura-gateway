@@ -1,0 +1,65 @@
+name: Deploy
+
+# Self-hosted Docker deploy. Opt-in per repository:
+#   vars:    DEPLOY_ENABLED=true, PUBLIC_URL, HOST_PORT (default 3000), RUNNER_LABEL (default api-efactura)
+#   secrets: API_KEY, ENCRYPTION_KEY, TOKEN_SIGNING_KEY, EFACTURA_USERNAME, EFACTURA_PASSWORD
+#            optional: EFACTURA_ENDPOINT, LOG_LEVEL
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    if: vars.DEPLOY_ENABLED == 'true'
+    runs-on: [self-hosted, linux, "${{ vars.RUNNER_LABEL || 'api-efactura' }}"]
+    env:
+      HOST_PORT: ${{ vars.HOST_PORT || '3000' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Write production env
+        env:
+          PUBLIC_URL: ${{ vars.PUBLIC_URL }}
+          API_KEY: ${{ secrets.API_KEY }}
+          ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
+          TOKEN_SIGNING_KEY: ${{ secrets.TOKEN_SIGNING_KEY }}
+          EFACTURA_ENDPOINT: ${{ secrets.EFACTURA_ENDPOINT }}
+          EFACTURA_USERNAME: ${{ secrets.EFACTURA_USERNAME }}
+          EFACTURA_PASSWORD: ${{ secrets.EFACTURA_PASSWORD }}
+          LOG_LEVEL: ${{ secrets.LOG_LEVEL }}
+        run: |
+          umask 077
+          cat > .env << EOF
+          PUBLIC_URL=${PUBLIC_URL}
+          BASE_PATH=/v1
+          HOST_PORT=${HOST_PORT}
+          API_KEY=${API_KEY}
+          ENCRYPTION_KEY=${ENCRYPTION_KEY}
+          TOKEN_SIGNING_KEY=${TOKEN_SIGNING_KEY}
+          EFACTURA_ENDPOINT=${EFACTURA_ENDPOINT:-https://efactura-api.sfs.md/Service.svc}
+          EFACTURA_USERNAME=${EFACTURA_USERNAME}
+          EFACTURA_PASSWORD=${EFACTURA_PASSWORD}
+          SOAP_TIMEOUT_MS=30000
+          WRITE_TIMEOUT_MS=45000
+          READ_MAX_RETRIES=4
+          MCP_ENABLED=true
+          QUEUE_ENABLED=false
+          LOG_LEVEL=${LOG_LEVEL:-info}
+          LOG_CHANNEL=efactura
+          EOF
+          chmod 600 .env
+
+      - name: Build and start
+        run: docker compose -f docker-compose.prod.yml up -d --build --remove-orphans
+
+      - name: Smoke health
+        run: |
+          sleep 5
+          curl -fsS "http://127.0.0.1:${HOST_PORT}/health"
+          curl -fsS "http://127.0.0.1:${HOST_PORT}/v1/health"
+
+      - name: Remove env from the checkout
+        if: always()
+        run: rm -f .env

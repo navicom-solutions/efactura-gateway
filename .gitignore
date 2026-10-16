@@ -1,0 +1,14 @@
+node_modules/
+build/
+data/
+logs/
+.env
+.env.local
+.env.*.local
+.idea/
+.vscode/
+.DS_Store
+.secrets/
+docs/local/
+*.log
+coverage/
