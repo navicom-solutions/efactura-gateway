@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { loadEnv } from './env.js';
+import { DEFAULT_FEEDBACK_URL, loadEnv } from './env.js';
 
 const base = { API_KEY: 'k', EFACTURA_ENDPOINT: 'https://example.test/Service.svc' };
 
@@ -22,5 +22,20 @@ describe('loadEnv PUBLIC_URL', () => {
 
   it('defaults to localhost when nothing is set', () => {
     assert.equal(loadEnv(base).PUBLIC_URL, 'http://127.0.0.1:3000');
+  });
+});
+
+describe('loadEnv feedback', () => {
+  it('is on by default and uses the maintainers relay, also when FEEDBACK_URL is empty', () => {
+    for (const env of [loadEnv(base), loadEnv({ ...base, FEEDBACK_URL: '' })]) {
+      assert.equal(env.FEEDBACK_ENABLED, true);
+      assert.equal(env.FEEDBACK_URL, DEFAULT_FEEDBACK_URL);
+    }
+  });
+
+  it('accepts a custom relay and an opt-out', () => {
+    const env = loadEnv({ ...base, FEEDBACK_URL: 'https://relay.example/v1/reports', FEEDBACK_ENABLED: 'false' });
+    assert.equal(env.FEEDBACK_URL, 'https://relay.example/v1/reports');
+    assert.equal(env.FEEDBACK_ENABLED, false);
   });
 });

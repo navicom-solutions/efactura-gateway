@@ -1,6 +1,9 @@
 import { z } from 'zod';
 import { randomBytes } from 'node:crypto';
 
+/** Issue-report relay run by the maintainers (relay/). */
+export const DEFAULT_FEEDBACK_URL = 'https://efactura-feedback.dumitru-bulmaga.workers.dev/v1/reports';
+
 const EnvSchema = z.object({
   PUBLIC_URL: z.string().default('http://127.0.0.1:3000'),
   BASE_PATH: z.string().default('/v1'),
@@ -38,7 +41,11 @@ const EnvSchema = z.object({
     .string()
     .default('true')
     .transform((v) => v !== 'false' && v !== '0'),
-  FEEDBACK_URL: z.union([z.string().url(), z.literal('')]).default(''),
+  FEEDBACK_URL: z
+    .string()
+    .default('')
+    .transform((v) => v || DEFAULT_FEEDBACK_URL)
+    .pipe(z.string().url()),
 
   ENCRYPTION_KEY: z.string().min(32).optional(),
   TOKEN_SIGNING_KEY: z.string().min(32).optional(),

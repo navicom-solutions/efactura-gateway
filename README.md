@@ -235,6 +235,8 @@ it only after you agree.
 - Emails, IDNOs, IBANs, phone numbers, invoice numbers and secrets are masked before
   sending.
 - Reports are limited to 10 per deployment per day.
+- Reports go to the maintainers' relay by default. To receive them yourself, run your
+  own [feedback relay](#feedback-relay) and set `FEEDBACK_URL`.
 - To turn it off, set `FEEDBACK_ENABLED=false`. The tool then no longer appears.
 
 ## Design principles

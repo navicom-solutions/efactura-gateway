@@ -2,11 +2,12 @@ name = "efactura-feedback"
 main = "src/index.ts"
 compatibility_date = "2026-10-01"
 
-# Created with: npx wrangler d1 create efactura-feedback (paste the printed database_id here)
+# Running your own relay? Create a database with `npx wrangler d1 create efactura-feedback`
+# and replace database_id with the printed id.
 [[d1_databases]]
 binding = "DB"
 database_name = "efactura-feedback"
-database_id = "REPLACE_WITH_DATABASE_ID"
+database_id = "1fd92e3b-cc79-4eac-9f6b-d6bf5021d338"
 migrations_dir = "migrations"
 
 # Secrets (npx wrangler secret put <NAME>):
