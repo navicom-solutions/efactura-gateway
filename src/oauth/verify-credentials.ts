@@ -12,9 +12,7 @@ export type CredentialVerifier = (creds: ProviderCredentials) => Promise<Credent
 
 /** SFS answers invalid WS-Security credentials with its generic HTML 500 page, not a SOAP fault. */
 const isCredentialRejection = (err: AppError): boolean =>
-  err.kind === 'upstream_http' &&
-  err.statusCode === 502 &&
-  /error page|<!DOCTYPE html|<html[\s>]/i.test(err.message);
+  err.kind === 'upstream_http' && /error page|<!DOCTYPE html|<html[\s>]/i.test(err.message);
 
 /**
  * Checks credentials with a read-only SFS call. Pass a client without read retries so a

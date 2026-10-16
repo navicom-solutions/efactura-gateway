@@ -32,7 +32,7 @@ const looksLikeHtml = (body: string): boolean =>
 /** SFS often answers outages / bad auth with a generic HTML page; never echo that CSS to clients. */
 const describeHttpFailure = (status: number, body: string): string =>
   looksLikeHtml(body)
-    ? `SFS returned HTTP ${status} (temporary error page). Retry in a moment.`
+    ? `SFS rejected the call with HTTP ${status} (HTML error page). Usually wrong API username/password — reconnect OAuth after a password change. If credentials are correct, retry shortly.`
     : `SFS returned HTTP ${status}: ${body.replace(/\s+/g, ' ').trim().slice(0, 200)}`;
 
 export const createSoapClient = (
@@ -71,7 +71,8 @@ export const createSoapClient = (
           Accept: 'text/xml',
           'User-Agent': 'efactura-gateway/1.1',
           Connection: 'keep-alive',
-          SOAPAction: SOAP_ACTIONS[meta.operation],
+          // WCF expects a quoted SOAPAction value.
+          SOAPAction: `"${SOAP_ACTIONS[meta.operation]}"`,
         },
         body: envelope,
         signal: controller.signal,
@@ -79,6 +80,7 @@ export const createSoapClient = (
 
       const text = await res.text();
       const durationMs = Date.now() - started;
+      const html = looksLikeHtml(text);
 
       log('info', 'soap_response', {
         operation: meta.operation,
@@ -86,10 +88,13 @@ export const createSoapClient = (
         status_code: res.status,
         duration_ms: durationMs,
         is_write: meta.isWrite,
+        html,
       });
 
       if (!res.ok) {
-        return left(upstreamHttp(res.status, describeHttpFailure(res.status, text), meta.isWrite));
+        return left(
+          upstreamHttp(res.status, describeHttpFailure(res.status, text), meta.isWrite, { html }),
+        );
       }
 
       if (looksLikeHtml(text)) {

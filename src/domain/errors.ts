@@ -57,10 +57,15 @@ export const conflictError = (message: string): AppError => ({
   code: 'IDEMPOTENCY_CONFLICT',
 });
 
+/**
+ * Upstream failures use HTTP 503 (not 502/504). Cloudflare Tunnel replaces origin 502/504
+ * with its own error page, which hides our JSON body from MCP clients.
+ */
 export const upstreamTimeout = (message: string, forWrite: boolean): AppError => ({
   kind: 'upstream_timeout',
   message,
-  statusCode: 504,
+  // Ambiguous writes keep 504; reads use 503 so Cloudflare Tunnel does not replace the body.
+  statusCode: forWrite ? 504 : 503,
   retrySafe: !forWrite,
   code: forWrite ? 'UPSTREAM_TIMEOUT_AMBIGUOUS' : 'UPSTREAM_TIMEOUT',
 });
@@ -68,18 +73,25 @@ export const upstreamTimeout = (message: string, forWrite: boolean): AppError =>
 export const upstreamNetwork = (message: string, forWrite: boolean): AppError => ({
   kind: 'upstream_network',
   message,
-  statusCode: 502,
+  statusCode: forWrite ? 504 : 503,
   retrySafe: !forWrite,
   code: forWrite ? 'UPSTREAM_NETWORK_AMBIGUOUS' : 'UPSTREAM_NETWORK',
 });
 
-export const upstreamHttp = (status: number, message: string, forWrite: boolean): AppError => {
+export const upstreamHttp = (
+  status: number,
+  message: string,
+  forWrite: boolean,
+  opts: { readonly html?: boolean } = {},
+): AppError => {
   const ambiguous = forWrite && status >= 500;
+  // SFS HTML 500 pages are usually bad credentials or a hard failure — do not retry-storm.
+  const html = opts.html === true;
   return {
     kind: 'upstream_http',
     message,
-    statusCode: status >= 500 ? 502 : 400,
-    retrySafe: !ambiguous,
+    statusCode: status >= 500 ? (forWrite ? 504 : 503) : 400,
+    retrySafe: !ambiguous && !html,
     code: ambiguous ? 'UPSTREAM_5XX_AMBIGUOUS' : 'UPSTREAM_HTTP',
   };
 };
@@ -112,7 +124,7 @@ export const internalError = (message: string, cause?: unknown): AppError => ({
 export const parseError = (message: string): AppError => ({
   kind: 'upstream_parse',
   message,
-  statusCode: 502,
+  statusCode: 503,
   retrySafe: true,
   code: 'UPSTREAM_PARSE',
 });
