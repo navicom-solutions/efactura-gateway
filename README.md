@@ -28,7 +28,7 @@ API e-Factura SFS · электронная фактура Молдова
 - [Design principles](#design-principles)
 - [FAQ](#faq)
 - [Română](#română--pe-scurt)
-- [Contributing](#contributing) · [License](#license)
+- [Contributing](#contributing) · [Disclaimer](#disclaimer) · [License](#license)
 
 ---
 
@@ -109,7 +109,8 @@ Starter instance with a 1 GB disk costs about $7/month at the time of writing).
    (custom connectors may require a paid Claude plan).
 2. Name it `eFactura` and paste `https://<your-address>/mcp` as the URL. Click **Add**.
 3. Click **Connect**. A page titled *Connect Moldova eFactura* opens: enter the
-   [API user's](#efactura-api-credentials) username and password, then **Authorize**.
+   [API user's](#efactura-api-credentials) username and password, then **Continue**. The
+   gateway checks them with SFS before connecting.
 4. In a new chat, enable the eFactura connector from the tools menu and ask, for example,
    *"Show invoices rejected this month"*.
 
@@ -337,6 +338,9 @@ e-Factura direct la **Claude, ChatGPT** și alți asistenți AI prin MCP.
 4. În Claude: **Settings → Connectors → Add custom connector**, adresa `https://<adresa>/mcp`.
 5. Apăsați **Connect** și introduceți utilizatorul și parola API de la pasul 1. Gata.
 
+Software-ul este oferit „ca atare”, fără garanții; îl folosiți pe propria răspundere.
+Facturile emise prin el au valoare juridică. Detalii în [Disclaimer](#disclaimer).
+
 Dezvoltat și publicat open-source de **Navicom Solutions Ltd.**
 
 ## Contributing
@@ -344,6 +348,22 @@ Dezvoltat și publicat open-source de **Navicom Solutions Ltd.**
 PRs are welcome. We hold contributions to the same standard as the existing code:
 typed errors as values, no hidden side effects, tests for every behavior change. Read
 [CONTRIBUTING.md](CONTRIBUTING.md) for the PR format before opening one.
+
+## Disclaimer
+
+**Use at your own risk.** `efactura-gateway` is provided "as is", without warranty of any
+kind, as stated in sections 15–16 of the [license](LICENSE). Navicom Solutions Ltd. is not
+liable for invoices issued, rejected, duplicated or lost, for penalties, or for any other
+damage resulting from its use.
+
+- Invoices posted through the gateway are legally binding documents. You are responsible
+  for their content and for checking them in [efactura.sfs.md](https://efactura.sfs.md).
+- AI assistants can make mistakes. Review every invoice an assistant prepares before
+  allowing it to post.
+- You are responsible for securing your deployment, your API keys and your SFS credentials,
+  and for complying with tax and data protection law.
+- SFS can change or interrupt its service at any time; the gateway may stop working until
+  it is updated.
 
 ## License
 
