@@ -17,6 +17,7 @@ import { registerMcpRoutes } from '../mcp/http.js';
 import { buildOpenApiDocument } from './openapi.js';
 import { safeEqual } from '../oauth/crypto.js';
 import { registerOAuthRoutes } from '../oauth/routes.js';
+import { createCredentialVerifier } from '../oauth/verify-credentials.js';
 import { createOAuthStore, type OAuthStore } from '../oauth/store.js';
 import { createInvoiceQueue, type InvoiceQueue } from '../queue/invoice-jobs.js';
 import { parseProviderCredentialsHeader, type ProviderCredentials } from '../soap/credentials.js';
@@ -275,7 +276,8 @@ export const buildApp = (deps: AppDeps): { app: FastifyInstance; services: Invoi
   if (env.MCP_ENABLED) {
     const oauthStore = deps.oauthStore ?? createOAuthStore(env.OAUTH_DATABASE_PATH);
     if (!deps.oauthStore) app.addHook('onClose', async () => oauthStore.close());
-    registerOAuthRoutes(app, env, oauthStore);
+    const verifySoap = deps.soap ?? createSoapClient({ ...env, READ_MAX_RETRIES: 0 }, log);
+    registerOAuthRoutes(app, env, oauthStore, createCredentialVerifier(verifySoap));
     registerMcpRoutes(app, env, oauthStore, services, queue);
   }
 

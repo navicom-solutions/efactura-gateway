@@ -10,8 +10,14 @@ import {
 } from './crypto.js';
 import { renderConsentPage, renderErrorPage } from './consent.js';
 import type { OAuthStore } from './store.js';
+import type { CredentialCheck, CredentialVerifier } from './verify-credentials.js';
 
 const ACCESS_PREFIX = 'efat_at_';
+
+const CREDENTIAL_ERRORS: Record<Exclude<CredentialCheck, 'valid'>, { message: string; invalid: boolean }> = {
+  rejected: { message: 'Incorrect username or password.', invalid: true },
+  unavailable: { message: "Couldn't reach e-Factura. Please try again in a moment.", invalid: false },
+};
 const REFRESH_PREFIX = 'efat_rt_';
 const DEFAULT_SCOPE = 'efactura:read efactura:write';
 
@@ -21,6 +27,7 @@ export const registerOAuthRoutes = (
   app: FastifyInstance,
   env: Env,
   store: OAuthStore,
+  verifyCredentials: CredentialVerifier,
 ): void => {
   const issuer = env.PUBLIC_URL.replace(/\/$/, '');
   const resource = mcpResourceUrl(env);
@@ -143,8 +150,8 @@ export const registerOAuthRoutes = (
     }
     const username = (body.username ?? '').trim();
     const password = body.password ?? '';
-    if (!username || !password) {
-      return reply.type('text/html').send(
+    const retryConsent = ({ message, invalid }: { message: string; invalid: boolean }) =>
+      reply.type('text/html').send(
         renderConsentPage({
           publicUrl: issuer,
           clientName: client.client_name ?? client.client_id,
@@ -155,10 +162,17 @@ export const registerOAuthRoutes = (
           codeChallengeMethod: body.code_challenge_method ?? 'S256',
           scope: body.scope ?? DEFAULT_SCOPE,
           resource: body.resource ?? resource,
-          error: 'Username and password are required.',
+          username,
+          error: message,
+          invalid,
         }),
       );
+    if (!username || !password) {
+      return retryConsent({ message: 'Enter your username and password.', invalid: true });
     }
+
+    const check = await verifyCredentials({ username, password });
+    if (check !== 'valid') return retryConsent(CREDENTIAL_ERRORS[check]);
 
     const conn = store.createConnection(username, encrypt(password, env.ENCRYPTION_KEY), username);
     const code = randomId(24);

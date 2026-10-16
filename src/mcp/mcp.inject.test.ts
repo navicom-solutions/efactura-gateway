@@ -7,7 +7,9 @@ import {
   buildTestApp,
   createSoapStub,
   FIXTURES,
+  left,
 } from '../test/helpers.js';
+import { upstreamHttp, upstreamTimeout } from '../domain/errors.js';
 
 type Ctx = ReturnType<typeof buildTestApp>;
 
@@ -33,7 +35,10 @@ describe('MCP + OAuth (inject)', () => {
   });
 
   const setup = (fixtureXml: string): Ctx => {
-    const ctx = buildTestApp({ soap: createSoapStub(fixtureXml) });
+    const soap = createSoapStub((meta) =>
+      meta.operation === 'getAcceptedInvoices' ? FIXTURES.acceptedOk : fixtureXml,
+    );
+    const ctx = buildTestApp({ soap });
     apps.push(ctx.app);
     ctxs.push(ctx);
     return ctx;
@@ -96,6 +101,77 @@ describe('MCP + OAuth (inject)', () => {
     const result = res.json().result;
     assert.equal(result.isError, false);
     assert.equal(JSON.parse(result.content[0].text).data.idno, '1015600027437');
+  });
+
+  it('initialize negotiates the protocol version and sends usage instructions', async () => {
+    const { app } = setup('<ok/>');
+    const res = await app.inject({
+      method: 'POST',
+      url: '/mcp',
+      headers: authHeader(),
+      payload: rpc('initialize', { protocolVersion: '2025-03-26' }),
+    });
+    const { result } = res.json();
+    assert.equal(result.protocolVersion, '2025-03-26');
+    assert.match(result.instructions, /actor_role/);
+    assert.match(result.instructions, /next_offset/);
+    assert.match(result.instructions, /idempotency_key/);
+  });
+
+  it('ping returns an empty result', async () => {
+    const { app } = setup('<ok/>');
+    const res = await app.inject({ method: 'POST', url: '/mcp', headers: authHeader(), payload: rpc('ping') });
+    assert.deepEqual(res.json().result, {});
+  });
+
+  it('tools/list exposes generated schemas and safety annotations', async () => {
+    const { app } = setup('<ok/>');
+    const res = await app.inject({ method: 'POST', url: '/mcp', headers: authHeader(), payload: rpc('tools/list') });
+    const tools = res.json().result.tools as Array<{
+      name: string;
+      inputSchema: { properties: Record<string, { description?: string }> };
+      annotations: { readOnlyHint: boolean; destructiveHint?: boolean };
+    }>;
+    const byName = new Map(tools.map((t) => [t.name, t]));
+    assert.equal(byName.get('efactura_search_invoices')?.annotations.readOnlyHint, true);
+    assert.equal(byName.get('efactura_post_invoice')?.annotations.destructiveHint, true);
+    assert.ok(byName.get('efactura_search_invoices')?.inputSchema.properties.issued_on?.description);
+    assert.ok(byName.get('efactura_search_invoices')?.inputSchema.properties.limit);
+  });
+
+  it('search returns one compact page with totals and status counts', async () => {
+    const row = (i: number) =>
+      `<a:Invoice><a:Number>${i}</a:Number><a:Seria>EAA</a:Seria><a:Status>2</a:Status><a:InvoiceStatus>${i % 3 === 0 ? 2 : 8}</a:InvoiceStatus><a:Message i:nil="true"/><a:TimeStamp>0001-01-01T00:00:00</a:TimeStamp></a:Invoice>`;
+    const rows = Array.from({ length: 60 }, (_, i) => row(i + 1)).join('');
+    const xml = FIXTURES.searchOk.replace(/<a:Results>[\s\S]*<\/a:Results>/, `<a:Results>${rows}</a:Results>`);
+    const { app } = setup(xml);
+    const res = await app.inject({
+      method: 'POST',
+      url: '/mcp',
+      headers: authHeader(),
+      payload: rpc('tools/call', { name: 'efactura_search_invoices', arguments: { actor_role: 1, status: 8 } }),
+    });
+    const page = JSON.parse(res.json().result.content[0].text);
+    assert.equal(page.total, 60);
+    assert.equal(page.returned, 25);
+    assert.equal(page.next_offset, 25);
+    assert.deepEqual(page.by_status, { 'signed by buyer': 40, 'rejected by buyer': 20 });
+    assert.deepEqual(page.results[0], { seria: 'EAA', number: '1', status: 8, status_label: 'signed by buyer' });
+  });
+
+  it('invalid tool arguments return an actionable error', async () => {
+    const { app } = setup('<ok/>');
+    const res = await app.inject({
+      method: 'POST',
+      url: '/mcp',
+      headers: authHeader(),
+      payload: rpc('tools/call', { name: 'efactura_search_invoices', arguments: { actor_role: 9 } }),
+    });
+    const { result } = res.json();
+    assert.equal(result.isError, true);
+    const body = JSON.parse(result.content[0].text);
+    assert.equal(body.code, 'VALIDATION_ERROR');
+    assert.ok(body.hint);
   });
 
   it('unknown JSON-RPC method → -32601', async () => {
@@ -232,6 +308,49 @@ describe('MCP + OAuth (inject)', () => {
       }).toString(),
     });
     assert.equal(reuse.statusCode, 400, 'refresh tokens rotate');
+  });
+
+  const submitConsent = async (app: FastifyInstance) => {
+    const reg = await app.inject({
+      method: 'POST',
+      url: '/register',
+      payload: { redirect_uris: [REDIRECT] },
+    });
+    return app.inject({
+      method: 'POST',
+      url: '/authorize',
+      headers: FORM,
+      payload: new URLSearchParams({
+        client_id: reg.json().client_id,
+        redirect_uri: REDIRECT,
+        code_challenge: CHALLENGE,
+        code_challenge_method: 'S256',
+        username: 'sfs-user',
+        password: 'wrong',
+      }).toString(),
+    });
+  };
+
+  it('re-renders consent with an error when SFS rejects the credentials', async () => {
+    const { app, soap } = setup('<ok/>');
+    soap.handler = async () =>
+      left(upstreamHttp(500, 'HTTP Error: 500 Response: <!DOCTYPE html>\n<html lang="ro">', false));
+    const res = await submitConsent(app);
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.headers.location, undefined);
+    assert.match(res.body, /Incorrect username or password/);
+    assert.match(res.body, /aria-invalid="true" aria-describedby="form-error"/);
+    assert.match(res.body, /value="sfs-user"/);
+    assert.equal(soap.calls.at(-1)?.meta.operation, 'getAcceptedInvoices');
+  });
+
+  it('re-renders consent with a retry hint when SFS is unreachable', async () => {
+    const { app, soap } = setup('<ok/>');
+    soap.handler = async () => left(upstreamTimeout('Upstream timeout', false));
+    const res = await submitConsent(app);
+    assert.equal(res.statusCode, 200);
+    assert.match(res.body, /Couldn't reach e-Factura/);
+    assert.doesNotMatch(res.body, /aria-invalid="true" aria-describedby/);
   });
 
   it('rejects /authorize for unregistered redirect_uri', async () => {
