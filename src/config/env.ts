@@ -34,6 +34,12 @@ const EnvSchema = z.object({
     .default('true')
     .transform((v) => v !== 'false' && v !== '0'),
 
+  FEEDBACK_ENABLED: z
+    .string()
+    .default('true')
+    .transform((v) => v !== 'false' && v !== '0'),
+  FEEDBACK_URL: z.union([z.string().url(), z.literal('')]).default(''),
+
   ENCRYPTION_KEY: z.string().min(32).optional(),
   TOKEN_SIGNING_KEY: z.string().min(32).optional(),
   ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().positive().default(3600),

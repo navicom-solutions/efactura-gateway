@@ -4,6 +4,7 @@ import path from 'node:path';
 import type { Env } from '../config/env.js';
 import { left, right, type Either } from '../fp/result.js';
 import type { AppError } from '../domain/errors.js';
+import type { FeedbackSender } from '../feedback/client.js';
 import type { SoapClient, SoapRequestMeta } from '../soap/client.js';
 import type { ProviderCredentials } from '../soap/credentials.js';
 import { createIdempotencyStore } from '../services/idempotency.js';
@@ -37,6 +38,8 @@ export const testEnv = (overrides: Partial<Env> = {}): Env => ({
   REDIS_URL: 'redis://127.0.0.1:6379',
   QUEUE_ENABLED: false,
   MCP_ENABLED: true,
+  FEEDBACK_ENABLED: false,
+  FEEDBACK_URL: '',
   ENCRYPTION_KEY: 'a'.repeat(64),
   TOKEN_SIGNING_KEY: 'b'.repeat(64),
   ACCESS_TOKEN_TTL_SECONDS: 3600,
@@ -113,6 +116,7 @@ export const buildTestApp = (opts?: {
   env?: Env;
   soap?: SoapStub;
   queue?: InvoiceQueue | null;
+  feedback?: FeedbackSender | null;
 }) => {
   const env = opts?.env ?? testEnv();
   const idem = tmpIdemStore(env);
@@ -125,6 +129,7 @@ export const buildTestApp = (opts?: {
     idempotencyStore: idem.store,
     oauthStore,
     queue: opts?.queue ?? null,
+    feedback: opts?.feedback ?? null,
   });
   return {
     app,

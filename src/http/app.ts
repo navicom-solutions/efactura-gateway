@@ -12,6 +12,7 @@ import {
   SearchInvoicesSchema,
   type ApiEnvelope,
 } from '../domain/types.js';
+import { createFeedbackSender, type FeedbackSender } from '../feedback/client.js';
 import { isLeft } from '../fp/result.js';
 import { registerMcpRoutes } from '../mcp/http.js';
 import { buildOpenApiDocument } from './openapi.js';
@@ -47,7 +48,14 @@ export type AppDeps = {
   readonly oauthStore?: OAuthStore;
   /** Inject for tests (null disables); defaults to BullMQ when QUEUE_ENABLED. */
   readonly queue?: InvoiceQueue | null;
+  /** Inject for tests (null disables); defaults to the relay at FEEDBACK_URL when FEEDBACK_ENABLED. */
+  readonly feedback?: FeedbackSender | null;
 };
+
+const defaultFeedback = (env: Env): FeedbackSender | null =>
+  env.FEEDBACK_ENABLED && env.FEEDBACK_URL
+    ? createFeedbackSender({ url: env.FEEDBACK_URL, publicUrl: env.PUBLIC_URL })
+    : null;
 
 const send = (reply: FastifyReply, statusCode: number, body: ApiEnvelope) =>
   reply.status(statusCode).send(body);
@@ -278,7 +286,8 @@ export const buildApp = (deps: AppDeps): { app: FastifyInstance; services: Invoi
     if (!deps.oauthStore) app.addHook('onClose', async () => oauthStore.close());
     const verifySoap = deps.soap ?? createSoapClient({ ...env, READ_MAX_RETRIES: 0 }, log);
     registerOAuthRoutes(app, env, oauthStore, createCredentialVerifier(verifySoap));
-    registerMcpRoutes(app, env, oauthStore, services, queue);
+    const feedback = deps.feedback !== undefined ? deps.feedback : defaultFeedback(env);
+    registerMcpRoutes(app, env, oauthStore, services, queue, feedback);
   }
 
   app.setNotFoundHandler((req, reply) => {

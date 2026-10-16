@@ -1,11 +1,13 @@
 import type { FastifyInstance } from 'fastify';
 import type { Env } from '../config/env.js';
+import { GATEWAY_VERSION } from '../config/version.js';
+import type { FeedbackSender } from '../feedback/client.js';
 import type { InvoiceServices } from '../services/invoices.js';
 import type { InvoiceQueue } from '../queue/invoice-jobs.js';
 import type { OAuthStore } from '../oauth/store.js';
 import { resolveMcpBearer, sendMcpUnauthorized } from '../oauth/routes.js';
-import { SERVER_INSTRUCTIONS } from './instructions.js';
-import { callMcpTool, MCP_TOOLS } from './tools.js';
+import { FEEDBACK_INSTRUCTIONS, SERVER_INSTRUCTIONS } from './instructions.js';
+import { callMcpTool, listMcpTools } from './tools.js';
 
 const SUPPORTED_PROTOCOL_VERSIONS = ['2025-06-18', '2025-03-26', '2024-11-05'] as const;
 
@@ -23,7 +25,11 @@ export const registerMcpRoutes = (
   store: OAuthStore,
   services: InvoiceServices,
   queue: InvoiceQueue | null,
+  feedback: FeedbackSender | null,
 ): void => {
+  const tools = listMcpTools(feedback !== null);
+  const instructions = feedback ? SERVER_INSTRUCTIONS + FEEDBACK_INSTRUCTIONS : SERVER_INSTRUCTIONS;
+
   app.post('/mcp', async (req, reply) => {
     const auth = resolveMcpBearer(env, store, req.headers.authorization);
     if (!auth.ok) {
@@ -49,17 +55,17 @@ export const registerMcpRoutes = (
         return ok({
           protocolVersion: negotiateProtocolVersion(body.params?.protocolVersion),
           capabilities: { tools: { listChanged: false } },
-          serverInfo: { name: 'efactura-gateway', title: 'e-Factura Moldova', version: '1.1.0' },
-          instructions: SERVER_INSTRUCTIONS,
+          serverInfo: { name: 'efactura-gateway', title: 'e-Factura Moldova', version: GATEWAY_VERSION },
+          instructions,
         });
       case 'ping':
         return ok({});
       case 'tools/list':
-        return ok({ tools: MCP_TOOLS });
+        return ok({ tools });
       case 'tools/call': {
         const name = String(body.params?.name ?? '');
         const args = (body.params?.arguments ?? {}) as Record<string, unknown>;
-        const result = await callMcpTool(name, args, services, auth.creds, queue);
+        const result = await callMcpTool(name, args, services, auth.creds, queue, feedback);
         return ok(result);
       }
       default:

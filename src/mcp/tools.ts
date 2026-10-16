@@ -10,6 +10,8 @@ import {
   SearchInvoicesSchema,
   type ApiEnvelope,
 } from '../domain/types.js';
+import type { FeedbackSender } from '../feedback/client.js';
+import { FeedbackReportSchema } from '../feedback/report.js';
 import { isLeft } from '../fp/result.js';
 import type { ProviderCredentials } from '../soap/credentials.js';
 import {
@@ -43,6 +45,7 @@ type ToolContext = {
   readonly services: InvoiceServices;
   readonly creds: ProviderCredentials;
   readonly queue: InvoiceQueue | null;
+  readonly feedback: FeedbackSender | null;
   readonly requestId: string;
 };
 
@@ -146,6 +149,25 @@ const PostInput = PostInvoiceSchema.extend({
     .default(true)
     .describe('Queue the post and return a job_id (check with efactura_job_status). Falls back to sync if queues are disabled.'),
 });
+
+const ReportShape = FeedbackReportSchema.shape;
+
+const ReportInput = z.object({
+  kind: ReportShape.kind.describe(
+    'bug: a tool failed or returned data that looks wrong; feature_request: the user needs something no tool offers; question: behaviour is unclear.',
+  ),
+  summary: ReportShape.summary.describe('One line, e.g. "search ignores the buyer_idno filter".'),
+  details: ReportShape.details.describe(
+    'What was attempted, what happened and what was expected. Describe it in general terms: no company names, IDNOs, invoice numbers, amounts or credentials.',
+  ),
+  tool: ReportShape.tool.describe('Tool involved, if any.'),
+  error_code: ReportShape.error_code.describe('Error code the tool returned, if any.'),
+  user_confirmed: z
+    .literal(true)
+    .describe('Set true only after showing the user this summary and details and they agreed to send it.'),
+});
+
+export const REPORT_ISSUE_TOOL = 'efactura_report_issue';
 
 const listRows = (envelope: ApiEnvelope): Array<Record<string, unknown>> =>
   ((envelope.results as Array<Record<string, unknown>> | undefined) ?? []).map(compactInvoiceRow);
@@ -289,6 +311,34 @@ const TOOL_DEFS = [
       return toolResult({ success: true, message: r.body.message, results: r.body.results, request_id: r.body.requestId });
     },
   }),
+  define({
+    name: REPORT_ISSUE_TOOL,
+    description:
+      'Send a bug report or feature request about this gateway to its maintainers. Use when a tool fails unexpectedly, returns data that looks wrong, or the user needs something no tool supports. Show the user the report and send only after they agree. Personal and business data is masked before sending.',
+    input: ReportInput,
+    annotations: {
+      title: 'Report an issue to the maintainers',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
+    run: async ({ user_confirmed: _confirmed, ...draft }, { feedback }) => {
+      if (!feedback) {
+        return toolError({ code: 'FEEDBACK_DISABLED', message: 'Issue reporting is turned off on this server.' });
+      }
+      const r = await feedback(draft);
+      if (isLeft(r)) return toolError(r.left);
+      const { id, duplicate, report } = r.right;
+      return toolResult({
+        success: true,
+        report_id: id,
+        duplicate,
+        message: duplicate ? 'This issue was already reported; no new report was created.' : 'Sent to the maintainers.',
+        sent: { kind: report.kind, summary: report.summary, details: report.details },
+      });
+    },
+  }),
 ];
 
 const toInputSchema = (schema: ZodTypeAny): Record<string, unknown> => {
@@ -307,6 +357,10 @@ export const MCP_TOOLS: McpTool[] = TOOL_DEFS.map((t) => ({
   annotations: t.annotations,
 }));
 
+/** Tools to advertise; the report tool is hidden when no feedback relay is configured. */
+export const listMcpTools = (feedbackEnabled: boolean): McpTool[] =>
+  feedbackEnabled ? MCP_TOOLS : MCP_TOOLS.filter((t) => t.name !== REPORT_ISSUE_TOOL);
+
 const TOOLS_BY_NAME = new Map(TOOL_DEFS.map((t) => [t.name, t]));
 
 export const callMcpTool = async (
@@ -315,11 +369,12 @@ export const callMcpTool = async (
   services: InvoiceServices,
   creds: ProviderCredentials,
   queue: InvoiceQueue | null,
+  feedback: FeedbackSender | null = null,
 ): Promise<ToolResult> => {
   const tool = TOOLS_BY_NAME.get(name);
   if (!tool) return toolError({ code: 'VALIDATION_ERROR', message: `Unknown tool: ${name}` });
   try {
-    return await tool.invoke(args, { services, creds, queue, requestId: newRequestId() });
+    return await tool.invoke(args, { services, creds, queue, feedback, requestId: newRequestId() });
   } catch (err) {
     return toolError({ code: 'INTERNAL', message: err instanceof Error ? err.message : String(err) });
   }

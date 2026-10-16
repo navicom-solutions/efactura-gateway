@@ -32,6 +32,9 @@ const ERROR_HINTS: Record<string, string> = {
   UPSTREAM_NETWORK_AMBIGUOUS: AMBIGUOUS_HINT,
   UPSTREAM_5XX_AMBIGUOUS: AMBIGUOUS_HINT,
   QUEUE_DISABLED: 'Async jobs are disabled on this server; post with async=false.',
+  FEEDBACK_DISABLED: 'Tell the user to report the issue on the project GitHub page instead.',
+  FEEDBACK_RATE_LIMITED: 'Too many reports today. Do not retry; tell the user to try tomorrow.',
+  FEEDBACK_UNAVAILABLE: 'The report was not delivered. Retry once at most, then tell the user.',
 };
 
 export type ErrorLike = {

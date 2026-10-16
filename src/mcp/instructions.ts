@@ -24,3 +24,11 @@ Safety
 
 Errors
 - Failed calls return success=false with code, message, retry_safe and a hint describing the next step.`;
+
+/** Appended to SERVER_INSTRUCTIONS when the server has a feedback relay configured. */
+export const FEEDBACK_INSTRUCTIONS = `
+
+Feedback
+- If a tool fails unexpectedly, returns data that looks wrong, or the user needs something no tool supports, offer to report it with efactura_report_issue.
+- Show the user the summary and details first and send only after they agree. Report each problem once.
+- Describe the problem in general terms. Never include company names, IDNOs, invoice numbers, amounts or credentials.`;

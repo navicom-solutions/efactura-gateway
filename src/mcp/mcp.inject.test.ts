@@ -10,6 +10,8 @@ import {
   left,
 } from '../test/helpers.js';
 import { upstreamHttp, upstreamTimeout } from '../domain/errors.js';
+import type { FeedbackDraft, FeedbackSender } from '../feedback/client.js';
+import { right } from '../fp/result.js';
 
 type Ctx = ReturnType<typeof buildTestApp>;
 
@@ -34,11 +36,11 @@ describe('MCP + OAuth (inject)', () => {
     while (ctxs.length) ctxs.pop()?.cleanup();
   });
 
-  const setup = (fixtureXml: string): Ctx => {
+  const setup = (fixtureXml: string, feedback: FeedbackSender | null = null): Ctx => {
     const soap = createSoapStub((meta) =>
       meta.operation === 'getAcceptedInvoices' ? FIXTURES.acceptedOk : fixtureXml,
     );
-    const ctx = buildTestApp({ soap });
+    const ctx = buildTestApp({ soap, feedback });
     apps.push(ctx.app);
     ctxs.push(ctx);
     return ctx;
@@ -172,6 +174,71 @@ describe('MCP + OAuth (inject)', () => {
     const body = JSON.parse(result.content[0].text);
     assert.equal(body.code, 'VALIDATION_ERROR');
     assert.ok(body.hint);
+  });
+
+  const toolNames = async (app: FastifyInstance): Promise<string[]> => {
+    const res = await app.inject({ method: 'POST', url: '/mcp', headers: authHeader(), payload: rpc('tools/list') });
+    return (res.json().result.tools as Array<{ name: string }>).map((t) => t.name);
+  };
+
+  const instructionsOf = async (app: FastifyInstance): Promise<string> => {
+    const res = await app.inject({ method: 'POST', url: '/mcp', headers: authHeader(), payload: rpc('initialize') });
+    return res.json().result.instructions;
+  };
+
+  const recordingSender = () => {
+    const drafts: FeedbackDraft[] = [];
+    const sender: FeedbackSender = async (draft) => {
+      drafts.push(draft);
+      return right({
+        id: 'R-1',
+        duplicate: false,
+        report: { ...draft, gateway_version: '1.1.0', instance: '0123456789abcdef' },
+      });
+    };
+    return { drafts, sender };
+  };
+
+  const report = { kind: 'bug', summary: 'search ignores buyer_idno', details: 'Returned all buyers.' };
+
+  it('hides the report tool and its instructions without a feedback relay', async () => {
+    const { app } = setup('<ok/>');
+    assert.ok(!(await toolNames(app)).includes('efactura_report_issue'));
+    assert.doesNotMatch(await instructionsOf(app), /efactura_report_issue/);
+  });
+
+  it('report tool requires user confirmation before sending', async () => {
+    const { drafts, sender } = recordingSender();
+    const { app } = setup('<ok/>', sender);
+    assert.ok((await toolNames(app)).includes('efactura_report_issue'));
+    assert.match(await instructionsOf(app), /send only after they agree/);
+    const res = await app.inject({
+      method: 'POST',
+      url: '/mcp',
+      headers: authHeader(),
+      payload: rpc('tools/call', { name: 'efactura_report_issue', arguments: report }),
+    });
+    assert.equal(res.json().result.isError, true);
+    assert.equal(JSON.parse(res.json().result.content[0].text).code, 'VALIDATION_ERROR');
+    assert.equal(drafts.length, 0);
+  });
+
+  it('report tool sends the draft and returns what was sent', async () => {
+    const { drafts, sender } = recordingSender();
+    const { app } = setup('<ok/>', sender);
+    const res = await app.inject({
+      method: 'POST',
+      url: '/mcp',
+      headers: authHeader(),
+      payload: rpc('tools/call', {
+        name: 'efactura_report_issue',
+        arguments: { ...report, tool: 'efactura_search_invoices', user_confirmed: true },
+      }),
+    });
+    const body = JSON.parse(res.json().result.content[0].text);
+    assert.equal(body.report_id, 'R-1');
+    assert.equal(body.sent.summary, report.summary);
+    assert.deepEqual(drafts, [{ ...report, tool: 'efactura_search_invoices' }]);
   });
 
   it('unknown JSON-RPC method → -32601', async () => {
