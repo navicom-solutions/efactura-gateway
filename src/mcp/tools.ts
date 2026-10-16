@@ -200,7 +200,8 @@ const TOOL_DEFS = [
   }),
   define({
     name: 'efactura_get_invoice',
-    description: 'Get one invoice with parties, totals and lines by seria and number.',
+    description:
+      'Get one invoice with parties, totals and lines by seria and number. Use the exact number from search (including leading zeros).',
     input: GetInput,
     annotations: { title: 'Get invoice', ...READ },
     run: async ({ max_items, ...input }, { services, creds, requestId }) => {

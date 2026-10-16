@@ -7,6 +7,9 @@ const parser = new XMLParser({
   ignoreAttributes: false,
   removeNSPrefix: true,
   trimValues: true,
+  // Keep tag text as strings. Default number parsing drops leading zeros on invoice
+  // numbers (000787493 → 787493), and GetInvoicesBySeriaNumber then returns "not found".
+  parseTagValue: false,
   isArray: (name) =>
     ['Invoice', 'SeriaAndNumber', 'Taxpayer', 'XmlInvoice', 'string'].includes(name),
 });

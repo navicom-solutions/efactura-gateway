@@ -1,8 +1,10 @@
 # Production stack
 #   docker compose -f docker-compose.prod.yml up -d --build
 #   docker compose -f docker-compose.prod.yml --profile queue up -d --build   # + Redis for async posts
+#   docker compose -f docker-compose.prod.yml --profile tunnel up -d --build  # + Cloudflare Tunnel
 #
-# The API binds to 127.0.0.1:HOST_PORT; put a TLS-terminating reverse proxy in front.
+# The API binds to 127.0.0.1:HOST_PORT; put a TLS-terminating reverse proxy in front,
+# or use the tunnel profile (set TUNNEL_TOKEN in .env, route the hostname to http://api-efactura:3000).
 
 name: api-efactura
 
@@ -54,6 +56,19 @@ services:
     command: ["redis-server", "--appendonly", "yes"]
     volumes:
       - api-efactura-redis:/data
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+  cloudflared:
+    profiles: ["tunnel"]
+    image: cloudflare/cloudflared:latest
+    restart: always
+    command: ["tunnel", "--no-autoupdate", "run"]
+    env_file: .env
+    depends_on:
+      - api-efactura
     deploy:
       resources:
         limits:

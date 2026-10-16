@@ -159,30 +159,41 @@ export const createInvoiceServices = (
     );
   };
 
+  /** SFS stores invoice numbers as fixed-width strings (usually 9 digits with leading zeros). */
+  const numberVariants = (raw: string): string[] => {
+    const n = raw.trim();
+    const padded = n.padStart(9, '0');
+    return n === padded ? [n] : [n, padded];
+  };
+
   const getBySeria: InvoiceServices['getBySeria'] = async (input, creds, requestId) => {
-    const body = `<tns:GetInvoicesBySeriaNumber>
+    let lastMessage = 'Invoice not found';
+    for (const number of numberVariants(input.number)) {
+      const body = `<tns:GetInvoicesBySeriaNumber>
       <tns:request>
         <ax:RequestId>${escapeXml(requestId)}</ax:RequestId>
         <ax:SeriaAndNumbers>
           <ax:InvoiceIndentificator>
-            <ax:Number>${escapeXml(input.number)}</ax:Number>
+            <ax:Number>${escapeXml(number)}</ax:Number>
             <ax:Seria>${escapeXml(input.seria)}</ax:Seria>
           </ax:InvoiceIndentificator>
         </ax:SeriaAndNumbers>
       </tns:request>
     </tns:GetInvoicesBySeriaNumber>`;
 
-    const xmlE = await soap.call(
-      { operation: 'getBySeriaNumber', requestId, isWrite: false },
-      creds,
-      body,
-    );
-    if (isLeft(xmlE)) return xmlE;
-    const parsed = parseGetBySeriaResponse(xmlE.right);
-    if (isLeft(parsed)) return parsed;
-    const r = parsed.right;
-    if (!r.success) return left(notFoundError(r.message || 'Invoice not found'));
-    return right(okEnvelope(r.requestId || requestId, r.results, r.total, r.message));
+      const xmlE = await soap.call(
+        { operation: 'getBySeriaNumber', requestId, isWrite: false },
+        creds,
+        body,
+      );
+      if (isLeft(xmlE)) return xmlE;
+      const parsed = parseGetBySeriaResponse(xmlE.right);
+      if (isLeft(parsed)) return parsed;
+      const r = parsed.right;
+      if (r.success) return right(okEnvelope(r.requestId || requestId, r.results, r.total, r.message));
+      lastMessage = r.message || lastMessage;
+    }
+    return left(notFoundError(lastMessage));
   };
 
   const assignSerials: InvoiceServices['assignSerials'] = async (input, creds, requestId) => {

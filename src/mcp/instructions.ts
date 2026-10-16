@@ -7,7 +7,7 @@ export const SERVER_INSTRUCTIONS = `efactura-gateway gives you access to Moldova
 Codes
 - actor_role is the side you look from: ${describeCodes(ACTOR_ROLES)}. For "my sales" use 1, for "my purchases" use 2.
 - Invoice status: ${describeCodes(INVOICE_STATUSES)}.
-- An invoice is identified by seria (letters, e.g. EAA) plus number.
+- An invoice is identified by seria (letters, e.g. EAA) plus number. Pass number exactly as returned by search (it often has leading zeros, e.g. 000787493).
 - Dates are YYYY-MM-DD.
 
 Data volume

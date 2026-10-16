@@ -17,6 +17,15 @@ describe('SOAP response parsers', () => {
     assert.equal(r.right.total, 1);
     assert.equal(r.right.results[0]!.serial, 'EAA');
     assert.equal(r.right.results[0]!.seria, 'EAA');
+    // Fixtures use Number 001 — must keep leading zeros for GetInvoicesBySeriaNumber.
+    assert.equal(r.right.results[0]!.number, '001');
+  });
+
+  it('keeps leading zeros on invoice numbers', () => {
+    const xml = FIXTURES.searchOk.replace('<a:Number>001</a:Number>', '<a:Number>000787493</a:Number>');
+    const r = parseSearchResponse(xml);
+    assert.ok(isRight(r));
+    assert.equal(r.right.results[0]!.number, '000787493');
   });
 
   it('reads nil elements as empty text', () => {

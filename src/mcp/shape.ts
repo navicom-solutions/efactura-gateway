@@ -20,7 +20,8 @@ const AMBIGUOUS_HINT =
 
 const ERROR_HINTS: Record<string, string> = {
   VALIDATION_ERROR: 'Fix the arguments described in message and call again.',
-  NOT_FOUND: 'Check seria and number, or locate the invoice with efactura_search_invoices.',
+  NOT_FOUND:
+    'Pass seria and number exactly as returned by search (keep leading zeros). If it still fails, search again and retry get.',
   UPSTREAM_TIMEOUT: 'SFS was slow. Safe to retry; narrow the filters (for example issued_on) for searches.',
   UPSTREAM_NETWORK: 'Safe to retry in a moment.',
   UPSTREAM_HTTP: 'SFS returned an error. Safe to retry later; if it persists, the API user may lack access.',
