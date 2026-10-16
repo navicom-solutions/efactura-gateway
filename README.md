@@ -68,6 +68,20 @@ writes safe to retry.
 
 ## Quick start
 
+### One-click deploy
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/navicom-solutions/efactura-gateway)
+
+The [Render Blueprint](render.yaml) provisions the Docker service with a persistent disk
+for the idempotency ledger, generates `API_KEY`, `ENCRYPTION_KEY` and `TOKEN_SIGNING_KEY`,
+and asks for your SFS credentials. Set `PUBLIC_URL` to the service URL
+(`https://<name>.onrender.com`) so OAuth for MCP clients resolves correctly. A paid
+instance is required because free instances cannot attach disks.
+
+Any host works as long as `/app/data` is on persistent storage. Avoid platforms with an
+ephemeral filesystem only (Heroku, DigitalOcean App Platform): losing the ledger on
+redeploy defeats duplicate-invoice protection.
+
 ### Docker
 
 ```bash

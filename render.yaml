@@ -1,0 +1,41 @@
+# One-click deploy: https://render.com/deploy?repo=https://github.com/navicom-solutions/efactura-gateway
+# The idempotency ledger and OAuth store are SQLite files; they MUST live on the persistent
+# disk, otherwise a redeploy forgets which invoices were already posted.
+services:
+  - type: web
+    name: efactura-gateway
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    healthCheckPath: /health
+    disk:
+      name: data
+      mountPath: /app/data
+      sizeGB: 1
+    envVars:
+      - key: PORT
+        value: "3000"
+      - key: HTTP_PORT
+        value: "3000"
+      - key: PUBLIC_URL
+        sync: false
+      - key: API_KEY
+        generateValue: true
+      - key: ENCRYPTION_KEY
+        generateValue: true
+      - key: TOKEN_SIGNING_KEY
+        generateValue: true
+      - key: EFACTURA_ENDPOINT
+        value: https://efactura-api.sfs.md/Service.svc
+      - key: EFACTURA_USERNAME
+        sync: false
+      - key: EFACTURA_PASSWORD
+        sync: false
+      - key: DATABASE_PATH
+        value: /app/data/idempotency.db
+      - key: OAUTH_DATABASE_PATH
+        value: /app/data/oauth.db
+      - key: MCP_ENABLED
+        value: "true"
+      - key: QUEUE_ENABLED
+        value: "false"
