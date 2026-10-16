@@ -25,7 +25,9 @@ const ERROR_HINTS: Record<string, string> = {
   UPSTREAM_TIMEOUT: 'SFS was slow. Safe to retry; narrow the filters (for example issued_on) for searches.',
   UPSTREAM_NETWORK: 'Safe to retry in a moment.',
   UPSTREAM_HTTP:
-    'If this followed a password change, reconnect OAuth with the new API password. Otherwise wait a few seconds and retry once; persistent failures usually mean bad credentials or no access to that invoice.',
+    'Wait a few seconds and retry once. If it keeps failing after a password change, reconnect OAuth.',
+  PROVIDER_UNAUTHORIZED:
+    'The eFactura API username/password is wrong or outdated. Tell the user to reconnect the connector and enter the current API password from efactura.sfs.md (Company users). Do not retry with the same credentials.',
   UPSTREAM_PARSE: 'Safe to retry.',
   UPSTREAM_BUSINESS: 'SFS rejected the request. Explain the message to the user.',
   IDEMPOTENCY_CONFLICT: 'This idempotency_key was used for a different invoice. Use a new key for a new invoice.',
