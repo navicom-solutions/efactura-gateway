@@ -16,6 +16,14 @@ const asArray = <T>(v: T | T[] | undefined | null): T[] => {
   return Array.isArray(v) ? v : [v];
 };
 
+/** Text content of a parsed node; nil elements (`i:nil="true"`) parse as attribute-only objects. */
+const text = (v: unknown, fallback = ''): string => {
+  if (v == null) return fallback;
+  if (typeof v !== 'object') return String(v);
+  const inner = (v as Record<string, unknown>)['#text'];
+  return inner == null ? fallback : String(inner);
+};
+
 const dig = (obj: unknown, path: string[]): unknown => {
   let cur: unknown = obj;
   for (const p of path) {
@@ -88,7 +96,7 @@ export const parseSearchResponse = (xml: string): Either<AppError, SearchResult>
             seria,
             status: Number(row.Status ?? 0),
             invoiceStatus: Number(row.InvoiceStatus ?? 0),
-            message: String(row.Message ?? ''),
+            message: text(row.Message),
             timeStamp: String(row.TimeStamp ?? ''),
           };
         })
@@ -98,7 +106,7 @@ export const parseSearchResponse = (xml: string): Either<AppError, SearchResult>
     success: status === 2,
     requestId: String(result.RequestId ?? ''),
     timeStamp: String(result.TimeStamp ?? new Date().toISOString()),
-    message: String(result.Message ?? ''),
+    message: text(result.Message),
     total: results.length,
     results,
   });
@@ -115,7 +123,7 @@ export const parseGetBySeriaResponse = (xml: string): Either<AppError, SearchRes
     (n) => n as Record<string, unknown>,
   );
   let success = status === 2;
-  let message = String(result.Message ?? '');
+  let message = text(result.Message);
   const results: Array<Record<string, unknown>> = [];
 
   if (nodes[0] && Number(nodes[0].Status ?? 2) !== 2) {
@@ -130,7 +138,7 @@ export const parseGetBySeriaResponse = (xml: string): Either<AppError, SearchRes
         number: String(node.Number ?? ''),
         status: Number(node.Status ?? 0),
         invoiceStatus: Number(node.InvoiceStatus ?? 0),
-        message: String(node.Message ?? ''),
+        message: text(node.Message),
         timeStamp: String(node.TimeStamp ?? ''),
       };
       if (typeof node.Xml === 'string' && node.Xml.length > 0) {
@@ -199,7 +207,7 @@ export const parsePostInvoicesResponse = (
 
   const posted = Number(result.TotalInvoicesPosted ?? 0);
   const total = Number(result.TotalInvoices ?? 0);
-  const errorMessage = String(result.ErrorMessage ?? '').trim();
+  const errorMessage = text(result.ErrorMessage).trim();
   const success = posted > 0;
 
   return right({
@@ -243,7 +251,7 @@ export const parseTaxpayerResponse = (
   if (!node) {
     return right({
       success: false,
-      message: String(result.Message ?? 'Taxpayer does not exist in the registry.'),
+      message: text(result.Message, 'Taxpayer does not exist in the registry.'),
       timeStamp: String(result.TimeStamp ?? new Date().toISOString()),
       data: null,
     });
@@ -260,7 +268,7 @@ export const parseTaxpayerResponse = (
   };
 
   const success = status === 1 && data.exists_in_tax_registry;
-  let message = String(result.Message ?? '');
+  let message = text(result.Message);
   if (!success && !message) {
     message = data.exists_in_tax_registry
       ? 'Failed to retrieve valid taxpayer information.'
@@ -293,19 +301,19 @@ export const parseInvoiceListResponse = (
     seria: String(inv.Seria ?? ''),
     status: Number(inv.Status ?? 0),
     invoiceStatus: Number(inv.InvoiceStatus ?? 0),
-    message: String(inv.Message ?? ''),
+    message: text(inv.Message),
     timeStamp: String(inv.TimeStamp ?? ''),
   }));
 
   if (status !== 2) {
-    return left(upstreamBusiness(String(result.Message ?? 'Upstream rejected the request')));
+    return left(upstreamBusiness(text(result.Message, 'Upstream rejected the request')));
   }
 
   return right({
     success: true,
     requestId: String(result.RequestId ?? ''),
     timeStamp: String(result.TimeStamp ?? new Date().toISOString()),
-    message: String(result.Message ?? ''),
+    message: text(result.Message),
     total: results.length,
     results,
   });

@@ -19,6 +19,17 @@ describe('SOAP response parsers', () => {
     assert.equal(r.right.results[0]!.seria, 'EAA');
   });
 
+  it('reads nil elements as empty text', () => {
+    const xml = FIXTURES.searchOk.replace(
+      '<a:Message></a:Message>\n            <a:TimeStamp>',
+      '<a:Message i:nil="true"/>\n            <a:TimeStamp>',
+    );
+    assert.notEqual(xml, FIXTURES.searchOk);
+    const r = parseSearchResponse(xml);
+    assert.ok(isRight(r));
+    assert.equal(r.right.results[0]!.message, '');
+  });
+
   it('parses assign serials', () => {
     const r = parseAssignSerialsResponse(FIXTURES.assignOk);
     assert.ok(isRight(r));

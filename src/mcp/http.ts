@@ -4,7 +4,13 @@ import type { InvoiceServices } from '../services/invoices.js';
 import type { InvoiceQueue } from '../queue/invoice-jobs.js';
 import type { OAuthStore } from '../oauth/store.js';
 import { resolveMcpBearer, sendMcpUnauthorized } from '../oauth/routes.js';
+import { SERVER_INSTRUCTIONS } from './instructions.js';
 import { callMcpTool, MCP_TOOLS } from './tools.js';
+
+const SUPPORTED_PROTOCOL_VERSIONS = ['2025-06-18', '2025-03-26', '2024-11-05'] as const;
+
+const negotiateProtocolVersion = (requested: unknown): string =>
+  SUPPORTED_PROTOCOL_VERSIONS.find((v) => v === requested) ?? SUPPORTED_PROTOCOL_VERSIONS[0];
 
 /**
  * Minimal Streamable-HTTP-compatible MCP endpoint:
@@ -36,24 +42,20 @@ export const registerMcpRoutes = (
     const fail = (code: number, message: string) =>
       reply.send({ jsonrpc: '2.0', id, error: { code, message } });
 
+    if (body.method?.startsWith('notifications/')) return reply.status(202).send();
+
     switch (body.method) {
       case 'initialize':
         return ok({
-          protocolVersion: '2025-03-26',
-          capabilities: { tools: { listChanged: true } },
-          serverInfo: { name: 'efactura-gateway', version: '1.1.0' },
+          protocolVersion: negotiateProtocolVersion(body.params?.protocolVersion),
+          capabilities: { tools: { listChanged: false } },
+          serverInfo: { name: 'efactura-gateway', title: 'e-Factura Moldova', version: '1.1.0' },
+          instructions: SERVER_INSTRUCTIONS,
         });
-      case 'notifications/initialized':
       case 'ping':
-        return reply.status(202).send();
+        return ok({});
       case 'tools/list':
-        return ok({
-          tools: MCP_TOOLS.map((t) => ({
-            name: t.name,
-            description: t.description,
-            inputSchema: t.inputSchema,
-          })),
-        });
+        return ok({ tools: MCP_TOOLS });
       case 'tools/call': {
         const name = String(body.params?.name ?? '');
         const args = (body.params?.arguments ?? {}) as Record<string, unknown>;
